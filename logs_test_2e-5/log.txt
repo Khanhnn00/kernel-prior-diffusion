@@ -1,0 +1,7 @@
+Logging to logs_test_2e-5
+creating model and diffusion...
+sampling...
+created 10 samples
+saving to logs_test_2e-5/samples_10x16x16x1.npz
+sampling complete
+sampling time: 177.17833733558655
