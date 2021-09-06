@@ -26,7 +26,7 @@ def model_and_diffusion_defaults():
         class_cond=False,
         diffusion_steps=2000,
         noise_schedule="linear",
-        timestep_respacing="",
+        timestep_respacing="250",
         use_kl=True,
         predict_xstart=False,
         rescale_timesteps=True,

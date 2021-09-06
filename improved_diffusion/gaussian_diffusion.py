@@ -475,8 +475,8 @@ class GaussianDiffusion:
                     model_kwargs=model_kwargs,
                 )
                 yield out
-                # img = out["sample"]
-                img = out["pred_xstart"]
+                img = out["sample"]
+                # img = out["pred_xstart"]
 
     def ddim_sample(
         self,
