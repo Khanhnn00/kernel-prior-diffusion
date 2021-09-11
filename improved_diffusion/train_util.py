@@ -9,7 +9,6 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
-import torch.optim as optim
 from torchvision.utils import save_image
 
 from . import dist_util, logger
@@ -39,8 +38,6 @@ class TrainLoop:
         batch_size,
         microbatch,
         lr,
-        lr_decay,
-        lr_gamma,
         ema_rate,
         log_interval,
         save_interval,
@@ -62,8 +59,6 @@ class TrainLoop:
             if isinstance(ema_rate, float)
             else [float(x) for x in ema_rate.split(",")]
         )
-        self.lr_decay = lr_decay
-        self.lr_gamma = lr_gamma
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
@@ -87,11 +82,7 @@ class TrainLoop:
         if self.use_fp16:
             self._setup_fp16()
 
-        self.opt = AdamW(self.master_params, lr=self.lr, weight_decay=self.weight_decay)
-        self.scheduler = optim.lr_scheduler.MultiStepLR(self.opt,
-                                                                lr_decay,
-                                                                lr_gamma)
-        logger.log("lr_scheduler milestones: %s   gamma: %f"%(self.scheduler.milestones, self.scheduler.gamma))                                                  
+        self.opt = AdamW(self.master_params, lr=self.lr, weight_decay=self.weight_decay)                                               
         if self.resume_step:
             self._load_optimizer_state()
             # Model was resumed, either due to a restart or a checkpoint
@@ -187,7 +178,6 @@ class TrainLoop:
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
 
-            self.scheduler.step(self.step)
             self.step += 1
             # print('self.step: {}'.format(self.step))
         # Save the last checkpoint if it wasn't already saved.
@@ -346,34 +336,28 @@ class TrainLoop:
                 clip_denoised=True,
                 model_kwargs=model_kwargs,
             )
-            # sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
-            sample = sample.permute(0, 2, 3, 1)
+            sample = sample.clamp(0, 0.15)
             sample = sample.contiguous()
 
             gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
             all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
+
             logger.log(f"created {len(all_images) * 10} samples")
+        
         t1 = time.time()
         logger.log("Sampling completed after {} secs".format(str(t1-t0)))
+
         arr = np.concatenate(all_images, axis=0)
-        arr = arr[: 20]
-        filename = 'samples_at_step_{}.npz'.format(str(self.step))
-        np.savez(os.path.join(get_blob_logdir(), filename), arr)
-        samples = self.post_process(th.from_numpy(arr))
+        arr = th.tensor(arr)
+
+        samples = arr
         filename = 'generated_samples_at_step_{}'.format(str(self.step)) + '.png'
 
         # rescale the maximum value to 1 for visualization, from
         samples_max, _ = samples.flatten(2).max(2, keepdim=True)
         samples = samples / samples_max.unsqueeze(3)
         save_image(samples, os.path.join(get_blob_logdir(), filename), nrow=10, normalize=True)
-
-    def post_process(self, x):
-        # inverse process of pre_process in dataloader
-        x = x.view(x.shape[0], 1, int(16), int(16))
-        x = ((th.sigmoid(x) - 1e-06) / (1 - 2 * 1e-06))
-        x = x * 0.16908
-        return x
 
 
 def parse_resume_step_from_filename(filename):

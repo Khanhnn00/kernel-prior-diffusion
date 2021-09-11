@@ -80,5 +80,6 @@ class KernelDataset(Dataset):
         path = self.local_kernels[idx]
         img = np.load(path)
         img = img.astype(np.float32)
+
         out_dict = {}
         return np.expand_dims(img, axis=0), out_dict

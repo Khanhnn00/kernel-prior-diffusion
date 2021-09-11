@@ -6,13 +6,12 @@ numpy array. This can be used to produce samples for FID evaluation.
 import argparse
 import os, time
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 os.environ['OPENAI_LOGDIR'] = 'logs_test_2e-5'
 
 if not os.path.exists(os.environ['OPENAI_LOGDIR']):
     os.mkdir(os.environ['OPENAI_LOGDIR'])
 
-import torch
 import numpy as np
 import torch as th
 
@@ -39,7 +38,7 @@ def main():
     model, diffusion = create_model_and_diffusion(
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
-    if torch.cuda.is_available():
+    if th.cuda.is_available():
         model.load_state_dict(
         dist_util.load_state_dict(args.model_path)
     )
@@ -50,7 +49,7 @@ def main():
     logger.log("sampling...")
     
     # kernel_code = th.randn((1, 1, 16, 16), device=dist_util.dev())
-    kernel_code = th.load('tensor_2.pt').to(dist_util.dev())
+    # kernel_code = th.load('tensor_2.pt').to(dist_util.dev())
     # th.save(kernel_code, 'tensor_2.pt')
 
     all_images = []
@@ -64,7 +63,6 @@ def main():
         sample = sample_fn(
             model,
             (args.batch_size, 1, args.image_size, args.image_size),
-            kernel_code,
             clip_denoised=args.clip_denoised,
             model_kwargs=model_kwargs,
         )
@@ -80,18 +78,12 @@ def main():
     arr = np.concatenate(all_images, axis=0)
     arr = th.tensor(arr)
 
-    # if dist.get_rank() == 0:
-    #     shape_str = "x".join([str(x) for x in arr.shape])
-    #     out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
-    #     logger.log(f"saving to {out_path}")
-    #     np.savez(out_path, arr)
-
     filename = 'generated_samples' + '.png'
 
     # rescale the maximum value to 1 for visualization, from
     samples_max, _ = arr.flatten(2).max(2, keepdim=True)
     samples = arr / samples_max.unsqueeze(3)
-    save_image(samples, os.path.join(logger.get_dir(), filename), nrow=16, normalize=True)
+    save_image(samples, os.path.join(logger.get_dir(), filename), nrow=10, normalize=True)
 
     dist.barrier()
     logger.log("sampling complete")
@@ -101,10 +93,10 @@ def main():
 def create_argparser():
     defaults = dict(
         clip_denoised=True,
-        num_samples=1,
-        batch_size=1,
+        num_samples=100,
+        batch_size=10,
         use_ddim=False,
-        model_path="",
+        model_path="experiments/logs_1000_0.0001_KL/ema_0.9999_116000.pt",
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

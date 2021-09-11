@@ -6,7 +6,7 @@ import argparse
 import os
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 from datetime import datetime
 import torch.nn as nn
@@ -77,8 +77,6 @@ def main():
         batch_size=args.batch_size,
         microbatch=args.microbatch,
         lr=args.lr,
-        lr_decay = args.lr_decay,
-        lr_gamma= args.lr_gamma,
         ema_rate=args.ema_rate,
         log_interval=args.log_interval,
         save_interval=args.save_interval,
@@ -96,8 +94,6 @@ def create_argparser():
         data_dir="",
         schedule_sampler="uniform",
         lr=1e-4,
-        lr_decay=[3000,12000],
-        lr_gamma=0.5,
         weight_decay=0.0,
         lr_anneal_steps=0,
         batch_size=1,
