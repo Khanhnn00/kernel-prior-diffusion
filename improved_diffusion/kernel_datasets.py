@@ -3,6 +3,8 @@ import blobfile as bf
 from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
+import torch
+import torchvision.transforms.functional as F
 
 
 def load_kernel(
@@ -59,7 +61,7 @@ def _list_image_files_recursively(data_dir):
     for entry in sorted(bf.listdir(data_dir)):
         full_path = bf.join(data_dir, entry)
         ext = entry.split(".")[-1]
-        if "." in entry and ext.lower() in ["npy"]:
+        if "." in entry and ext.lower() in ["pth"]:
             results.append(full_path)
         elif bf.isdir(full_path):
             results.extend(_list_image_files_recursively(full_path))
@@ -78,8 +80,13 @@ class KernelDataset(Dataset):
 
     def __getitem__(self, idx):
         path = self.local_kernels[idx]
-        img = np.load(path)
-        img = img.astype(np.float32)
+        kernel = torch.load(path)
+        kernel = torch.clamp(kernel, min=0) / 0.16908
 
+        kernel = kernel + np.random.rand(*kernel.shape) / 720.0
+        kernel = kernel - 0.0171
         out_dict = {}
-        return np.expand_dims(img, axis=0), out_dict
+
+        kernel = F.resize(kernel.unsqueeze(0).unsqueeze(0), 16)
+        kernel = np.array(kernel.squeeze(0)).astype(np.float32)
+        return kernel, out_dict

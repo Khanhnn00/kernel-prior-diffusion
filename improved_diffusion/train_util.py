@@ -336,7 +336,7 @@ class TrainLoop:
                 clip_denoised=True,
                 model_kwargs=model_kwargs,
             )
-            sample = sample.clamp(0, 0.15)
+            sample = (sample + 0.0171) * 0.16908
             sample = sample.contiguous()
 
             gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
